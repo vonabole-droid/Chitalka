@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Точки">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="apple-touch-icon.png">
+<title>Точки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400&family=IBM+Plex+Mono:wght@300&display=swap">
+<style>
+/* One year = 12 rows (months) × 31 columns (days). Pure black, hairlines, white for done, red only for "today, not yet". */
+:root{
+  --bg:#000; --hair:#222; --dim:#444; --mid:#777; --fg:#e8e8e8; --accent:#e5473a;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);overflow:hidden}
+body{color:var(--fg);font-family:var(--f-ui);font-weight:300;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;-webkit-touch-callout:none}
+[hidden]{display:none!important}
+.app{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(env(safe-area-inset-top,0px) + 56px) max(20px, env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 56px) max(20px, env(safe-area-inset-left,0px))}
+.fade{transition:opacity .5s ease}
+.name{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 18px);text-align:center;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mid);pointer-events:none;padding:0 24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pager{display:flex;gap:6px;justify-content:center;margin-top:10px}
+.pager i{width:4px;height:4px;border-radius:50%;background:var(--hair)}
+.pager i.on{background:var(--mid)}
+.wrap{position:relative;width:100%;max-width:560px;display:flex}
+.months{display:flex;flex-direction:column;width:16px;flex:none;font-family:var(--f-num);font-size:9px;color:var(--hair)}
+.months span{display:flex;align-items:center}
+canvas{display:block;flex:1;min-width:0}
+.toast{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);text-align:center;font-family:var(--f-num);font-size:11px;letter-spacing:.12em;color:var(--mid);pointer-events:none;opacity:0}
+.hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 52px);text-align:center;font-size:11px;line-height:2;letter-spacing:.08em;color:var(--dim);pointer-events:none}
+body.zen .chrome{opacity:0!important}
+
+/* menu */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg);border-top:1px solid var(--hair);max-width:560px;margin:0 auto;max-height:86%;overflow:auto;touch-action:pan-y;-webkit-user-select:text;user-select:text;
+  padding:20px max(20px, env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(20px, env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:18px}
+.lbl{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.list{display:flex;flex-direction:column;border-top:1px solid var(--hair)}
+.list button{display:flex;justify-content:space-between;align-items:center;padding:13px 2px;border-bottom:1px solid var(--hair);text-align:left;color:var(--mid);font-size:15px}
+.list button.cur{color:var(--fg)}
+.list button small{font-family:var(--f-num);font-size:11px;color:var(--dim)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:1px solid var(--mid);outline-offset:3px}
+input[type=text]{width:100%;background:var(--bg);border:0;border-bottom:1px solid var(--dim);color:var(--fg);font:300 17px var(--f-ui);padding:8px 0;border-radius:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{padding:10px 14px;border:1px solid var(--hair);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mid)}
+.btn.warn{color:var(--accent);border-color:var(--accent)}
+.year{display:flex;align-items:center;gap:18px;font-family:var(--f-num);font-size:14px;color:var(--mid)}
+.year button{width:36px;height:36px;border:1px solid var(--hair);border-radius:50%;color:var(--mid)}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0}
+.note{font-size:12px;line-height:1.6;color:var(--dim)}
+.msg{font-size:12px;color:var(--mid)}
+</style>
+</head>
+<body>
+<div class="name chrome fade" id="name"><span id="nameT"></span><div class="pager" id="pager"></div></div>
+<div class="app">
+  <div class="wrap"><div class="months chrome fade" id="months"></div><canvas id="cv" aria-label="Год"></canvas></div>
+</div>
+<div class="hint chrome fade" id="hint" hidden>тап — отметить сегодня<br>тап по точке — прошлый день<br>свайп — другая привычка<br>долгий тап — меню<br>двойной тап — спрятать всё</div>
+<div class="toast" id="toast"></div>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
+  <div class="lbl">Привычки</div>
+  <div class="list" id="list"></div>
+  <button class="btn" id="add" style="align-self:flex-start">+ Привычка</button>
+  <div>
+    <div class="lbl">Название</div>
+    <input type="text" id="rename" maxlength="40" autocomplete="off" enterkeyhint="done">
+  </div>
+  <div class="year"><button id="yPrev" aria-label="Прошлый год">‹</button><span id="yVal"></span><button id="yNext" aria-label="Следующий год">›</button></div>
+  <div>
+    <div class="lbl" style="margin-bottom:10px">Резервная копия</div>
+    <div class="row">
+      <button class="btn" id="exp">Экспорт</button>
+      <label class="btn file">Импорт<input type="file" id="imp" accept=".json,application/json"></label>
+    </div>
+    <p class="note">Данные хранятся только на этом телефоне. Раз в месяц делай экспорт и сохраняй файл в «Файлы» — так ничего не потеряется.</p>
+    <div class="msg" id="msg"></div>
+  </div>
+  <div class="row"><button class="btn warn" id="del">Удалить привычку</button><span style="flex:1"></span><button class="btn" id="close">Готово</button></div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const KEY = "dots-habits-v1";
+const MON = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+const MLET = ["Я","Ф","М","А","М","И","И","А","С","О","Н","Д"];
+const pad = n => String(n).padStart(2,"0");
+const key = (y,m,d) => `${y}-${pad(m+1)}-${pad(d)}`;
+const now = () => { const t=new Date(); return {y:t.getFullYear(), m:t.getMonth(), d:t.getDate()}; };
+const dim = (y,m) => new Date(y,m+1,0).getDate();
+
+// ---------- state ----------
+let S = null;
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function load(){ try{ S=JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){ S=null; }
+  if(!S || !Array.isArray(S.habits) || !S.habits.length) S={habits:[{id:uid(),name:"Привычка",days:{}}],cur:0,hint:false,zen:false};
+  S.cur=Math.min(S.cur||0,S.habits.length-1); }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+const H = () => S.habits[S.cur];
+let year = now().y;
+
+// ---------- layout / draw ----------
+const cv=$("cv"), ctx=cv.getContext("2d");
+let G={cw:0,rh:0,w:0,h:0};
+function layout(){
+  const wrap=cv.parentElement, W=wrap.clientWidth-16;
+  const availH = window.innerHeight - 170;
+  const cw = W/31;
+  const rh = Math.max(cw*1.6, Math.min(cw*4, availH/12));
+  const h = rh*12;
+  const dpr = window.devicePixelRatio||1;
+  cv.style.width=W+"px"; cv.style.height=h+"px";
+  cv.width=Math.round(W*dpr); cv.height=Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  G={cw,rh,w:W,h};
+  const mo=$("months"); mo.style.height=h+"px";
+  mo.innerHTML = MLET.map(l=>`<span style="height:${rh}px">${l}</span>`).join("");
+  draw();
+}
+function draw(){
+  const {cw,rh,w,h}=G, t=now(), days=H().days;
+  ctx.clearRect(0,0,w,h);
+  const rDone=Math.min(cw*0.34,5), rDot=Math.max(1.3,Math.min(cw*0.12,1.8));
+  for(let m=0;m<12;m++){
+    const n=dim(year,m), y=(m+0.5)*rh;
+    for(let d=1;d<=n;d++){
+      const x=(d-0.5)*cw, k=key(year,m,d);
+      const future = year>t.y || (year===t.y && (m>t.m || (m===t.m && d>t.d)));
+      const isToday = year===t.y && m===t.m && d===t.d;
+      const done = !!days[k];
+      ctx.beginPath();
+      if(done){ ctx.fillStyle="#e8e8e8"; ctx.arc(x,y,rDone,0,Math.PI*2); }
+      else { ctx.fillStyle= future? "#1b1b1b" : "#3a3a3a"; ctx.arc(x,y,rDot,0,Math.PI*2); }
+      ctx.fill();
+      if(isToday){ ctx.beginPath(); ctx.lineWidth=1; ctx.strokeStyle= done? "#555" : "#e5473a"; ctx.arc(x,y,rDone+3.2,0,Math.PI*2); ctx.stroke(); }
+    }
+  }
+}
+
+// ---------- chrome ----------
+let nameT=null, toastT=null;
+function showName(){
+  $("nameT").textContent=H().name;
+  $("pager").innerHTML = S.habits.length>1 ? S.habits.map((_,i)=>`<i class="${i===S.cur?"on":""}"></i>`).join("") : "";
+  const n=$("name"); n.style.opacity=1; clearTimeout(nameT);
+  nameT=setTimeout(()=>n.style.opacity=0, 1700);
+}
+function toast(m){ const t=$("toast"); t.textContent=m; t.style.transition="none"; t.style.opacity=1; void t.offsetWidth; t.style.transition="opacity .8s ease"; clearTimeout(toastT); toastT=setTimeout(()=>t.style.opacity=0,900); }
+function setZen(on){ S.zen=on; document.body.classList.toggle("zen",on); save(); }
+function hideHint(){ if(!$("hint").hidden){ $("hint").style.opacity=0; setTimeout(()=>$("hint").hidden=true,500); S.hint=true; save(); } }
+
+// ---------- actions ----------
+function toggle(k){ const d=H().days; if(d[k]) delete d[k]; else d[k]=1; save(); draw(); return !!d[k]; }
+function hit(cx,cy){
+  const r=cv.getBoundingClientRect();
+  if(cx<r.left||cx>r.right||cy<r.top-4||cy>r.bottom+4) return null;
+  const m=Math.floor((cy-r.top)/G.rh), d=Math.floor((cx-r.left)/G.cw)+1;
+  if(m<0||m>11||d<1||d>dim(year,m)) return "void";
+  const t=now();
+  if(year>t.y || (year===t.y && (m>t.m || (m===t.m && d>t.d)))) return "void";
+  return {m,d};
+}
+let lastTap=0, lastKey=null;
+function tap(cx,cy){
+  hideHint();
+  const h=hit(cx,cy), t=now(), ts=performance.now();
+  let k=null, label="";
+  if(h && h!=="void"){ k=key(year,h.m,h.d); label=`${h.d} ${MON[h.m]}`; }
+  else if(h===null && year===t.y){ k=key(t.y,t.m,t.d); label="сегодня"; }
+  if(ts-lastTap<300){
+    lastTap=0;
+    if(lastKey) toggle(lastKey);          // undo the first tap
+    lastKey=null; setZen(!S.zen); return;
+  }
+  lastTap=ts; lastKey=k;
+  if(k){ const on=toggle(k); toast(label+(on?"  ●":"  ○")); }
+}
+function switchHabit(dir){
+  if(S.habits.length<2) { showName(); return; }
+  S.cur=(S.cur+dir+S.habits.length)%S.habits.length; save(); draw(); showName();
+}
+
+// ---------- gestures ----------
+let p=null, lpT=null;
+document.addEventListener("pointerdown",e=>{
+  if(!$("sheet").hidden) return;
+  p={x:e.clientX,y:e.clientY,t:performance.now(),moved:false,long:false};
+  clearTimeout(lpT); lpT=setTimeout(()=>{ if(p && !p.moved){ p.long=true; openMenu(); } },550);
+});
+document.addEventListener("pointermove",e=>{ if(p && Math.hypot(e.clientX-p.x,e.clientY-p.y)>10){ p.moved=true; clearTimeout(lpT); } });
+document.addEventListener("pointerup",e=>{
+  clearTimeout(lpT); if(!p) return; const q=p; p=null;
+  if(q.long) return;
+  const dx=e.clientX-q.x, dy=e.clientY-q.y;
+  if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.3){ hideHint(); switchHabit(dx<0?1:-1); return; }
+  if(!q.moved) tap(e.clientX,e.clientY);
+});
+document.addEventListener("pointercancel",()=>{ clearTimeout(lpT); p=null; });
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",e=>{
+  if(!$("sheet").hidden){ if(e.key==="Escape") closeMenu(); return; }
+  const t=now();
+  if(e.key===" "){ e.preventDefault(); const on=toggle(key(t.y,t.m,t.d)); toast("сегодня"+(on?"  ●":"  ○")); }
+  else if(e.key==="ArrowRight") switchHabit(1);
+  else if(e.key==="ArrowLeft") switchHabit(-1);
+  else if(e.key==="m"||e.key==="ь") openMenu();
+  else if(e.key==="h"||e.key==="р") setZen(!S.zen);
+});
+
+// ---------- menu ----------
+let delArmed=false;
+function count(h,y){ return Object.keys(h.days).filter(k=>k.startsWith(y+"-")).length; }
+function renderMenu(){
+  $("list").innerHTML = S.habits.map((h,i)=>`<button data-i="${i}" class="${i===S.cur?"cur":""}"><span></span><small>${count(h,year)}</small></button>`).join("");
+  [...$("list").children].forEach((b,i)=>{ b.firstChild.textContent=S.habits[i].name; b.onclick=()=>{ S.cur=i; save(); delArmed=false; renderMenu(); draw(); }; });
+  $("rename").value=H().name; $("yVal").textContent=year;
+  $("yNext").disabled = year>=now().y; $("yNext").style.opacity = year>=now().y ? .3 : 1;
+  $("del").textContent = delArmed ? "Точно удалить?" : "Удалить привычку";
+  $("del").hidden = S.habits.length<2;
+}
+let openedAt=0;
+function openMenu(){ openedAt=performance.now(); hideHint(); delArmed=false; $("msg").textContent=""; renderMenu(); $("sheet").hidden=false; $("scrim").hidden=false; }
+function closeMenu(){ const v=$("rename").value.trim(); if(v){ H().name=v; save(); } $("sheet").hidden=true; $("scrim").hidden=true; draw(); showName(); }
+$("close").onclick=closeMenu; $("scrim").onclick=()=>{ if(performance.now()-openedAt>500) closeMenu(); };
+$("rename").oninput=()=>{ const v=$("rename").value.trim(); if(v){ H().name=v; save(); const b=$("list").children[S.cur]; if(b) b.firstChild.textContent=v; } };
+$("rename").onkeydown=e=>{ if(e.key==="Enter") $("rename").blur(); };
+$("add").onclick=()=>{ S.habits.push({id:uid(),name:"Привычка "+(S.habits.length+1),days:{}}); S.cur=S.habits.length-1; save(); renderMenu(); draw(); $("rename").focus(); $("rename").select(); };
+$("del").onclick=()=>{ if(!delArmed){ delArmed=true; renderMenu(); return; } S.habits.splice(S.cur,1); S.cur=Math.max(0,S.cur-1); delArmed=false; save(); renderMenu(); draw(); };
+$("yPrev").onclick=()=>{ year--; renderMenu(); draw(); };
+$("yNext").onclick=()=>{ if(year<now().y){ year++; renderMenu(); draw(); } };
+$("exp").onclick=()=>{
+  const t=now(), blob=new Blob([JSON.stringify({app:"dots",v:1,habits:S.habits},null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`tochki-${key(t.y,t.m,t.d)}.json`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  $("msg").textContent="Файл создан. Сохрани его в «Файлы».";
+};
+$("imp").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+  r.onload=()=>{ try{
+      const j=JSON.parse(r.result); if(!Array.isArray(j.habits)||!j.habits.length) throw 0;
+      S.habits=j.habits.map(h=>({id:h.id||uid(),name:String(h.name||"Привычка").slice(0,40),days:(h.days&&typeof h.days==="object")?h.days:{}}));
+      S.cur=0; save(); renderMenu(); draw(); $("msg").textContent=`Загружено привычек: ${S.habits.length}.`;
+    }catch(err){ $("msg").textContent="Это не файл экспорта «Точек». Выбери файл tochki-….json."; }
+    e.target.value=""; };
+  r.readAsText(f);
+};
+
+// ---------- boot ----------
+load();
+document.body.classList.toggle("zen",!!S.zen);
+if(!S.hint) $("hint").hidden=false;
+window.addEventListener("resize",layout);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ year = Math.min(year, now().y); draw(); } });
+setInterval(draw, 60000); // midnight rollover
+layout(); showName();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layout);
+})();
+</script>
+</body>
+</html>
