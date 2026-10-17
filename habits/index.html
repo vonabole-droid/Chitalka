@@ -191,27 +191,45 @@ function tap(cx,cy){
   lastTap=ts; lastKey=k;
   if(k){ const on=toggle(k); toast(label+(on?"  ●":"  ○")); }
 }
+const wrapEl=document.querySelector(".wrap");
+function slide(x,anim){ wrapEl.style.transition=anim?"transform .22s ease, opacity .22s ease":"none"; wrapEl.style.transform=x?`translateX(${x}px)`:""; wrapEl.style.opacity = x? Math.max(.25,1-Math.abs(x)/400) : 1; }
 function switchHabit(dir){
-  if(S.habits.length<2) { showName(); return; }
-  S.cur=(S.cur+dir+S.habits.length)%S.habits.length; save(); draw(); showName();
+  if(S.habits.length<2){ slide(0,true); toast("одна привычка · долгий тап → + привычка"); showName(); return; }
+  const W=window.innerWidth;
+  slide(dir>0?-W*0.6:W*0.6,true);
+  setTimeout(()=>{
+    S.cur=(S.cur+dir+S.habits.length)%S.habits.length; save(); draw(); showName();
+    slide(dir>0?W*0.6:-W*0.6,false); void wrapEl.offsetWidth; slide(0,true);
+  },180);
 }
 
-// ---------- gestures ----------
+// ---------- gestures (touch first, mouse fallback) ----------
 let p=null, lpT=null;
-document.addEventListener("pointerdown",e=>{
+function gStart(x,y){
   if(!$("sheet").hidden) return;
-  p={x:e.clientX,y:e.clientY,t:performance.now(),moved:false,long:false};
+  p={x,y,moved:false,long:false,horiz:false};
   clearTimeout(lpT); lpT=setTimeout(()=>{ if(p && !p.moved){ p.long=true; openMenu(); } },550);
-});
-document.addEventListener("pointermove",e=>{ if(p && Math.hypot(e.clientX-p.x,e.clientY-p.y)>10){ p.moved=true; clearTimeout(lpT); } });
-document.addEventListener("pointerup",e=>{
+}
+function gMove(x,y){
+  if(!p) return;
+  const dx=x-p.x, dy=y-p.y;
+  if(!p.moved && Math.hypot(dx,dy)>10){ p.moved=true; clearTimeout(lpT); p.horiz=Math.abs(dx)>Math.abs(dy); }
+  if(p.horiz){ const k = S.habits.length<2 ? 0.25 : 1; slide(dx*k,false); }
+}
+function gEnd(x,y){
   clearTimeout(lpT); if(!p) return; const q=p; p=null;
   if(q.long) return;
-  const dx=e.clientX-q.x, dy=e.clientY-q.y;
-  if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.3){ hideHint(); switchHabit(dx<0?1:-1); return; }
-  if(!q.moved) tap(e.clientX,e.clientY);
-});
-document.addEventListener("pointercancel",()=>{ clearTimeout(lpT); p=null; });
+  const dx=x-q.x;
+  if(q.horiz){ if(Math.abs(dx)>45){ hideHint(); switchHabit(dx<0?1:-1); } else slide(0,true); return; }
+  if(!q.moved) tap(x,y);
+}
+document.addEventListener("touchstart",e=>{ if(e.touches.length!==1){ p=null; clearTimeout(lpT); return; } const t=e.touches[0]; gStart(t.clientX,t.clientY); },{passive:true});
+document.addEventListener("touchmove",e=>{ const t=e.touches[0]; if(t) gMove(t.clientX,t.clientY); if(!$("sheet").hidden) return; e.preventDefault(); },{passive:false});
+document.addEventListener("touchend",e=>{ const t=e.changedTouches[0]; if(!t) return; const wasSheet=!$("sheet").hidden; gEnd(t.clientX,t.clientY); if(!wasSheet && e.cancelable) e.preventDefault(); },{passive:false});
+document.addEventListener("touchcancel",()=>{ clearTimeout(lpT); p=null; slide(0,true); });
+document.addEventListener("mousedown",e=>gStart(e.clientX,e.clientY));
+document.addEventListener("mousemove",e=>{ if(e.buttons) gMove(e.clientX,e.clientY); });
+document.addEventListener("mouseup",e=>gEnd(e.clientX,e.clientY));
 document.addEventListener("contextmenu",e=>e.preventDefault());
 document.addEventListener("keydown",e=>{
   if(!$("sheet").hidden){ if(e.key==="Escape") closeMenu(); return; }
