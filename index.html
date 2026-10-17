@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Читалка">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*,*::before,*::after{box-sizing:border-box}img{max-width:100%}[hidden]{display:none!important}html{-webkit-text-size-adjust:100%}</style>
+<title>Скорочиталка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400&family=IBM+Plex+Sans:wght@300;400&family=IBM+Plex+Mono:wght@300;400&display=swap">
+<style>
+/* Single deliberate look: pure black, hairline controls barely above the dark, nothing but the word gets contrast. */
+:root{
+  --bg:#000; --hair:#262626; --dim:#4a4a4a; --mid:#7a7a7a; --fg:#e6e6e6; --accent:#e5473a;
+  --f-word:"PT Serif","Times New Roman",Georgia,serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-weight:300;margin:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+.app{height:100%;max-width:720px;margin:0 auto;display:flex;flex-direction:column;box-sizing:border-box;
+  padding-left:max(20px, env(safe-area-inset-left, 0px));padding-right:max(20px, env(safe-area-inset-right, 0px));padding-block:14px 22px}
+.chrome{transition:opacity .35s ease}
+body.zen .chrome{opacity:0;pointer-events:none}
+body.zen .ctx{opacity:0}
+
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible,label:focus-within{outline:1px solid var(--mid);outline-offset:3px}
+
+.top{display:flex;justify-content:flex-end;gap:18px;align-items:center;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.top button{padding:6px 0}
+.top button[aria-pressed="true"]{color:var(--mid)}
+.top .sep{width:1px;height:12px;background:var(--hair)}
+
+.stage{flex:1;display:flex;flex-direction:column;justify-content:center;gap:28px;min-height:200px;cursor:pointer;user-select:none;-webkit-user-select:none;outline:none}
+.word{position:relative;height:clamp(90px,24vw,150px);font-family:var(--f-word);font-size:clamp(38px,10.5vw,66px);color:var(--fg);overflow:hidden}
+.word span{position:absolute;top:50%;transform:translateY(-52%);white-space:pre;line-height:1}
+#P{color:var(--accent)}
+.ctx{min-height:4.4em;max-height:7em;overflow:auto;font-family:var(--f-word);font-size:15px;line-height:1.5;color:var(--dim);text-align:center;max-width:58ch;margin:0 auto;text-wrap:pretty;transition:opacity .35s ease}
+.ctx mark{background:none;color:var(--mid);border-bottom:1px solid var(--accent)}
+.ctx.dim{opacity:0}
+
+.prog{display:flex;flex-direction:column;gap:8px}
+.bar{position:relative;height:16px;cursor:pointer;touch-action:none}
+.bar::before{content:"";position:absolute;left:0;right:0;top:8px;height:1px;background:var(--hair)}
+.fill{position:absolute;left:0;top:8px;height:1px;background:var(--dim);width:0}
+#docName{flex:1;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 12px}
+.meta{display:flex;justify-content:space-between;font-family:var(--f-num);font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+
+.transport{display:flex;align-items:center;justify-content:center;gap:30px;margin-top:18px;color:var(--dim)}
+.round{width:46px;height:46px;border-radius:50%;border:1px solid var(--hair);display:grid;place-items:center}
+.play{width:64px;height:64px;border-radius:50%;border:1px solid var(--dim);display:grid;place-items:center;color:var(--mid)}
+svg{display:block}
+
+.speed{display:grid;grid-template-columns:32px 1fr 32px;align-items:center;gap:14px;margin-top:22px}
+.step{height:32px;color:var(--dim);font-family:var(--f-num);font-size:18px;font-weight:300}
+.wpm{grid-column:1/-1;text-align:center;font-family:var(--f-num);font-size:12px;color:var(--dim);letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.wpm b{font-weight:400;color:var(--mid);font-size:14px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;height:24px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--hair)}
+input[type=range]::-moz-range-track{height:1px;background:var(--hair)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--bg);border:1px solid var(--mid);margin-top:-6px}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--bg);border:1px solid var(--mid)}
+
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg);border-top:1px solid var(--hair);
+  max-width:720px;margin:0 auto;box-sizing:border-box;
+  padding:22px max(20px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  display:flex;flex-direction:column;gap:14px;max-height:88%}
+.sheet h2{margin:0;font-family:var(--f-ui);font-weight:300;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mid)}
+.sheet p{margin:0;color:var(--dim);font-size:13px;line-height:1.5}
+textarea{width:100%;box-sizing:border-box;min-height:180px;flex:1;resize:vertical;border:1px solid var(--hair);border-radius:0;background:var(--bg);color:var(--fg);padding:12px;font:15px/1.5 var(--f-word)}
+textarea::placeholder{color:var(--dim)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{padding:10px 16px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--hair);color:var(--mid)}
+.btn.primary{border-color:var(--mid);color:var(--fg)}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.fname{font-size:11px;color:var(--dim);font-family:var(--f-num);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.err{color:var(--accent);font-size:13px}
+.toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);transition:opacity .6s;pointer-events:none;white-space:nowrap}
+
+@media (max-height:640px){ .ctx{min-height:3em;max-height:4.5em;font-size:14px} .speed{margin-top:12px} .transport{margin-top:10px} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <div class="top chrome">
+    <button id="lRU" aria-pressed="true">ru</button><button id="lEN" aria-pressed="false">en</button>
+    <span class="sep"></span>
+    <button id="openLib">Текст</button>
+  </div>
+
+  <div class="stage" id="stage" tabindex="0" aria-label="Play / pause">
+    <div class="word" id="word"><span id="L"></span><span id="P"></span><span id="R"></span></div>
+    <div class="ctx" id="ctx"></div>
+  </div>
+
+  <div class="chrome">
+    <div class="prog">
+      <div class="bar" id="bar" aria-label="Progress"><div class="fill" id="fill"></div></div>
+      <div class="meta"><span id="count">0 / 0</span><span id="docName"></span><span id="left">0:00</span></div>
+    </div>
+
+    <div class="transport">
+      <button class="round" id="back" aria-label="Previous sentence">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M6 5v14"/><path d="M19 5 9 12l10 7z"/></svg>
+      </button>
+      <button class="play" id="play" aria-label="Play">
+        <svg id="icoPlay" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M7 4.5v15l13-7.5z"/></svg>
+        <svg id="icoPause" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" hidden><path d="M8.5 5v14M15.5 5v14"/></svg>
+      </button>
+      <button class="round" id="fwd" aria-label="Next sentence">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z"/></svg>
+      </button>
+    </div>
+
+    <div class="speed">
+      <button class="step" id="slower" aria-label="Slower">−</button>
+      <input type="range" id="wpmR" min="100" max="1000" step="10" value="300" aria-label="Words per minute">
+      <button class="step" id="faster" aria-label="Faster">+</button>
+      <div class="wpm"><b id="wpmV">300</b> <span id="tWpm">слов/мин</span></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" style="opacity:0"></div>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="tLibH">
+  <h2 id="tLibH">Загрузить текст</h2>
+  <p id="tLibP"></p>
+  <textarea id="ta"></textarea>
+  <div class="row">
+    <label class="btn file"><span id="tFile">Файл</span><input type="file" id="file" accept=".txt,.md,.markdown,text/plain,text/markdown"></label>
+    <span class="fname" id="fname"></span>
+  </div>
+  <div class="err" id="err" hidden></div>
+  <div class="row">
+    <button class="btn" id="cancel">Отмена</button>
+    <button class="btn" id="clear">Очистить</button>
+    <span style="flex:1"></span>
+    <button class="btn primary" id="go">Читать</button>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const STR = {
+  ru:{brand:"Скорочиталка", lib:"Текст", wpm:"слов/мин", libH:"Загрузить текст", libP:"Вставь текст или открой .txt / .md. Двойной тап по экрану прячет интерфейс.", file:"Файл", cancel:"Отмена", clear:"Очистить", go:"Читать", ph:"Вставь сюда текст…", tap:"Тапни, чтобы начать", zenOn:"двойной тап — вернуть", end:"Конец текста. Тапни, чтобы начать заново.", sample:"Пример", pasted:"Вставленный текст", empty:"Пусто. Вставь текст или выбери файл.", bad:"Не удалось прочитать файл. Нужен текстовый .txt или .md в UTF-8."},
+  en:{brand:"Speed Reader", lib:"Text", wpm:"words/min", libH:"Load text", libP:"Paste text or open a .txt / .md. Double-tap the screen to hide the interface.", file:"File", cancel:"Cancel", clear:"Clear", go:"Read", ph:"Paste your text here…", tap:"Tap to start", zenOn:"double-tap to restore", end:"End of text. Tap to start over.", sample:"Sample", pasted:"Pasted text", empty:"Nothing here. Paste text or pick a file.", bad:"Couldn't read the file. Use a UTF-8 .txt or .md file."}
+};
+const SAMPLE = {
+  ru:`Сейчас ты читаешь без движения глаз. Каждое слово появляется в одной и той же точке, а красная буква всегда стоит ровно под засечками. Глазу не нужно прыгать по строке, искать начало следующего слова и возвращаться назад.
+
+Обычный взрослый читает около двухсот пятидесяти слов в минуту. Большую часть времени съедают саккады — быстрые скачки взгляда — и возвраты к уже прочитанному. Здесь их нет, поэтому скорость можно поднимать заметно выше привычной.
+
+Начни с трёхсот. Если текст понятен, добавь пятьдесят. На точках и запятых читалка сама делает паузу, длинные слова держит на экране дольше. Тапни по экрану в любой момент: появится всё предложение целиком, и можно будет вернуться назад.
+
+На какой скорости ты сломаешься? Проверь сам.`,
+  en:`Right now you are reading without moving your eyes. Every word appears in the same spot, and the red letter always sits exactly between the ticks. Your eye no longer has to jump along a line, hunt for the start of the next word, or skip back.
+
+A typical adult reads about two hundred and fifty words per minute. Most of that time goes to saccades, the quick jumps of the eye, and to re-reading. There are none here, so you can push the speed well past your usual pace.
+
+Start at three hundred. If it still makes sense, add fifty. The reader pauses on full stops and commas on its own and keeps long words on screen a little longer. Tap the screen at any moment to see the whole sentence and step back.
+
+At what speed do you break? Find out.`
+};
+
+let lang = "ru", wpm = 300, tokens = [], sentences = [], cum = [], pos = 0;
+let text = "", docName = "", isSample = true, playing = false, timer = null, warm = 0, done = false, wake = null;
+
+// ---------- storage ----------
+const KEY = "rsvp-reader-v1";
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({lang,wpm,text:isSample?"":text,docName,isSample,pos})); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){ return null; } }
+
+// ---------- text prep ----------
+function stripMd(s){
+  return s.replace(/\r/g,"")
+    .replace(/^---\n[\s\S]*?\n---\n/,"")                // front matter
+    .replace(/```[\s\S]*?```/g,"\n")                    // code fences
+    .replace(/<[^>]+>/g," ")                            // html
+    .replace(/!\[[^\]]*\]\([^)]*\)/g," ")               // images
+    .replace(/\[([^\]]+)\]\([^)]*\)/g,"$1")             // links
+    .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g,(m,a,b,c)=>c||a) // wikilinks
+    .replace(/^\s{0,3}#{1,6}\s+(.*)$/gm,"$1.\n")        // headings -> own sentence
+    .replace(/^\s{0,3}>\s?/gm,"")                       // quotes
+    .replace(/^\s*([-*+]|\d+[.)])\s+/gm,"")             // list markers
+    .replace(/^\s*([-*_]\s*){3,}$/gm,"")                // hr
+    .replace(/^\s*\|?[-:| ]+\|[-:| ]*$/gm,"")           // table separators
+    .replace(/\|/g," ")
+    .replace(/(\*\*|__|\*|_|~~|`)(?=\S)([\s\S]*?\S)\1/g,"$2")
+    .replace(/`/g,"")
+    .replace(/\.\.(?=\n)/g,".");
+}
+const END = /[.!?…]["»”’')\]]*$/;
+const MID = /[,;:]["»”’')\]]*$/;
+const lettersOf = w => w.replace(/[^\p{L}\p{N}]/gu,"");
+function splitLong(w){
+  const chars=[...w], n=lettersOf(w).length;
+  if(n<=13) return [w];
+  const parts=Math.ceil(n/9), size=Math.ceil(chars.length/parts), out=[];
+  for(let i=0;i<chars.length;i+=size) out.push(chars.slice(i,i+size).join(""));
+  // don't leave a tail of only punctuation
+  if(out.length>1 && !lettersOf(out[out.length-1])) { const t=out.pop(); out[out.length-1]+=t; }
+  return out.map((p,i)=> i<out.length-1 ? p+"-" : p);
+}
+function mult(w){
+  let m=1;
+  if(END.test(w)) m=2.6;
+  else if(MID.test(w) || /^[—–-]$/.test(w)) m=1.6;
+  const n=lettersOf(w).length;
+  if(n>8) m*=1.3;
+  if(n>=12) m*=1.15;
+  return m;
+}
+function parse(raw){
+  tokens=[]; sentences=[];
+  const paras = raw.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
+  let sStart=0;
+  const closeSentence = () => { if(tokens.length>sStart){ sentences.push([sStart,tokens.length-1]); for(let k=sStart;k<tokens.length;k++) tokens[k].s=sentences.length-1; sStart=tokens.length; } };
+  for(const p of paras){
+    const words=p.split(/\s+/).filter(Boolean);
+    for(const w of words){
+      const pieces=splitLong(w);
+      pieces.forEach((piece,i)=>{
+        const last=i===pieces.length-1;
+        tokens.push({w:piece, m: last?mult(w):1.25, cont:!last, s:0});
+      });
+      if(END.test(w)) closeSentence();
+    }
+    if(tokens.length) tokens[tokens.length-1].m=Math.max(tokens[tokens.length-1].m,3.2);
+    closeSentence();
+  }
+  cum=[0]; for(const t of tokens) cum.push(cum[cum.length-1]+t.m);
+}
+
+// ---------- ORP render ----------
+const L=$("L"), P=$("P"), R=$("R"), wordEl=$("word");
+function orp(w){
+  const ch=[...w], idx=[];
+  ch.forEach((c,i)=>{ if(/[\p{L}\p{N}]/u.test(c)) idx.push(i); });
+  if(!idx.length) return ["",ch[0]||"",ch.slice(1).join("")];
+  const n=idx.length, k = n<=1?0 : n<=5?1 : n<=9?2 : n<=13?3 : 4;
+  const pi=idx[Math.min(k,n-1)];
+  return [ch.slice(0,pi).join(""), ch[pi], ch.slice(pi+1).join("")];
+}
+function place(){
+  const W=wordEl.clientWidth, ax=W*0.42, pw=P.getBoundingClientRect().width;
+  P.style.left=(ax-pw/2)+"px";
+  L.style.right=(W-(ax-pw/2))+"px";
+  R.style.left=(ax+pw/2)+"px";
+}
+function showWord(w){ const [a,b,c]=orp(w); L.textContent=a; P.textContent=b; R.textContent=c; place(); }
+function showHint(msg){ L.textContent=""; R.textContent=""; P.textContent=""; ctx.classList.remove("dim"); ctx.textContent=msg; }
+
+// ---------- context ----------
+const ctx=$("ctx");
+function esc(s){ return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function showContext(){
+  if(!tokens.length){ ctx.textContent=STR[lang].empty; return; }
+  const [a,b]=sentences[tokens[pos].s]; let h="";
+  for(let i=a;i<=b;i++){
+    const t=tokens[i]; let w=t.cont? t.w.slice(0,-1) : t.w;
+    w = i===pos ? `<mark>${esc(w)}</mark>` : esc(w);
+    h += w + (t.cont ? "" : " ");
+  }
+  ctx.innerHTML=h.trim(); ctx.classList.remove("dim");
+}
+
+// ---------- progress ----------
+function fmt(sec){ sec=Math.max(0,Math.round(sec)); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60; return (h? h+":"+String(m).padStart(2,"0") : m)+":"+String(s).padStart(2,"0"); }
+function ui(){
+  const n=tokens.length;
+  $("fill").style.width = n? ((pos+ (done?1:0))/n*100)+"%" : "0";
+  $("count").textContent = n? `${(pos+1).toLocaleString()} / ${n.toLocaleString()}` : "0 / 0";
+  $("left").textContent = n? "−"+fmt((cum[n]-cum[pos])*60/wpm) : "0:00";
+}
+
+// ---------- engine ----------
+function tick(){
+  if(!playing) return;
+  const t=tokens[pos]; showWord(t.w); ui();
+  let d=60000/wpm*t.m;
+  if(warm>0){ d*=1+0.35*warm; warm--; }
+  timer=setTimeout(()=>{
+    if(pos<tokens.length-1){ pos++; tick(); }
+    else { done=true; pause(); showHint(STR[lang].end); ui(); }
+  }, d);
+}
+function setIcon(){ $("icoPlay").hidden=playing; $("icoPause").hidden=!playing; $("play").setAttribute("aria-label", playing?"Pause":"Play"); }
+async function lock(){ try{ if("wakeLock" in navigator) wake=await navigator.wakeLock.request("screen"); }catch(e){ wake=null; } }
+function unlock(){ try{ wake && wake.release(); }catch(e){} wake=null; }
+function play(){
+  if(!tokens.length){ openSheet(); return; }
+  if(done){ pos=0; done=false; }
+  playing=true; warm=3; ctx.classList.add("dim"); setIcon(); lock(); tick();
+}
+function resume(){ if(!tokens.length||done) return; playing=true; ctx.classList.add("dim"); setIcon(); lock(); tick(); }
+function pause(){ clearTimeout(timer); playing=false; setIcon(); unlock(); if(!done) showContext(); save(); }
+function toggle(){ playing? pause() : play(); }
+function seek(i){
+  if(!tokens.length) return;
+  pos=Math.max(0,Math.min(tokens.length-1,i)); done=false;
+  clearTimeout(timer);
+  if(playing){ warm=2; tick(); } else { showWord(tokens[pos].w); showContext(); ui(); save(); }
+}
+function prevSentence(){
+  if(!tokens.length) return;
+  const s=tokens[pos].s, start=sentences[s][0];
+  seek(pos-start>1 || s===0 ? start : sentences[s-1][0]);
+}
+function nextSentence(){
+  if(!tokens.length) return;
+  const s=tokens[pos].s; if(s<sentences.length-1) seek(sentences[s+1][0]);
+}
+
+// ---------- speed ----------
+function setWpm(v){ wpm=Math.max(100,Math.min(1000,Math.round(v/10)*10)); $("wpmR").value=wpm; $("wpmV").textContent=wpm; ui(); save(); }
+
+// ---------- language ----------
+function applyLang(){
+  const s=STR[lang];
+  document.documentElement.lang=lang;
+  $("openLib").textContent=s.lib; $("tWpm").textContent=s.wpm;
+  $("tLibH").textContent=s.libH; $("tLibP").textContent=s.libP; $("tFile").textContent=s.file;
+  $("cancel").textContent=s.cancel; $("clear").textContent=s.clear; $("go").textContent=s.go; $("ta").placeholder=s.ph;
+  $("lRU").setAttribute("aria-pressed", lang==="ru"); $("lEN").setAttribute("aria-pressed", lang==="en");
+  $("docName").textContent = isSample ? s.sample : (docName || s.pasted);
+}
+function setLang(l){
+  if(l===lang) return; lang=l;
+  if(isSample){ if(playing) pause(); setText(SAMPLE[lang], "", true, 0); }
+  applyLang(); if(!playing && tokens.length && !done) showContext(); save();
+}
+
+// ---------- text loading ----------
+function setText(raw, name, sample, startPos){
+  text=raw; docName=name; isSample=sample; done=false;
+  parse(stripMd(raw));
+  pos=Math.min(startPos||0, Math.max(0,tokens.length-1));
+  if(tokens.length){ showWord(tokens[pos].w); showContext(); } else { showHint(STR[lang].empty); }
+  applyLang(); ui(); save();
+}
+
+// ---------- sheet ----------
+const sheet=$("sheet"), scrim=$("scrim");
+function openSheet(){ if(playing) pause(); $("err").hidden=true; $("ta").value = isSample? "" : text; $("fname").textContent = isSample? "" : docName; sheet.hidden=false; scrim.hidden=false; setTimeout(()=>$("ta").focus(),50); }
+function closeSheet(){ sheet.hidden=true; scrim.hidden=true; }
+$("openLib").onclick=openSheet; $("cancel").onclick=closeSheet; scrim.onclick=closeSheet;
+$("clear").onclick=()=>{ $("ta").value=""; $("fname").textContent=""; $("file").value=""; };
+$("file").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ const t=String(r.result||""); if(/\u0000/.test(t)){ $("err").textContent=STR[lang].bad; $("err").hidden=false; return; } $("ta").value=t; $("fname").textContent=f.name; $("err").hidden=true; };
+  r.onerror=()=>{ $("err").textContent=STR[lang].bad; $("err").hidden=false; };
+  r.readAsText(f,"utf-8");
+};
+$("go").onclick=()=>{
+  const t=$("ta").value; if(!t.trim()){ $("err").textContent=STR[lang].empty; $("err").hidden=false; return; }
+  const name=$("fname").textContent || (t.trim().split(/\s+/).slice(0,4).join(" ")+"…");
+  setText(t, name, false, 0); closeSheet();
+};
+
+// ---------- controls ----------
+// tap = play/pause instantly; second tap within 300ms undoes it and toggles the interface
+let lastTap=0, toastT=null;
+function toast(m){ const t=$("toast"); t.textContent=m; t.style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>t.style.opacity=0,1400); }
+function setZen(on){ document.body.classList.toggle("zen",on); try{ localStorage.setItem(KEY+"-zen", on?"1":""); }catch(e){} if(on) toast(STR[lang].zenOn); }
+function stageTap(){
+  const now=performance.now();
+  if(now-lastTap<300){ lastTap=0; if(playing){ pause(); } else { resume(); } setZen(!document.body.classList.contains("zen")); return; }
+  lastTap=now; toggle();
+}
+$("stage").addEventListener("click",stageTap);
+try{ if(localStorage.getItem(KEY+"-zen")) document.body.classList.add("zen"); }catch(e){}
+$("stage").onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); toggle(); } };
+$("play").onclick=toggle; $("back").onclick=prevSentence; $("fwd").onclick=nextSentence;
+$("wpmR").oninput=e=>setWpm(+e.target.value);
+$("slower").onclick=()=>setWpm(wpm-25); $("faster").onclick=()=>setWpm(wpm+25);
+$("lRU").onclick=()=>setLang("ru"); $("lEN").onclick=()=>setLang("en");
+const bar=$("bar");
+function barSeek(e){ const r=bar.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width; seek(Math.floor(x*tokens.length)); }
+bar.addEventListener("pointerdown",e=>{ bar.setPointerCapture(e.pointerId); barSeek(e); });
+bar.addEventListener("pointermove",e=>{ if(e.buttons) barSeek(e); });
+document.addEventListener("keydown",e=>{
+  if(!sheet.hidden){ if(e.key==="Escape") closeSheet(); return; }
+  if(e.target.tagName==="INPUT" && e.target.type==="range" && e.key.startsWith("Arrow")) return;
+  if(e.key===" "){ e.preventDefault(); toggle(); }
+  else if(e.key==="ArrowLeft"){ e.preventDefault(); prevSentence(); }
+  else if(e.key==="ArrowRight"){ e.preventDefault(); nextSentence(); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); setWpm(wpm+25); }
+  else if(e.key==="ArrowDown"){ e.preventDefault(); setWpm(wpm-25); }
+  else if(e.key==="h"||e.key==="р"){ setZen(!document.body.classList.contains("zen")); }
+});
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && playing) pause(); });
+window.addEventListener("resize",()=>{ if(P.textContent) place(); });
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ if(P.textContent) place(); });
+
+// ---------- boot ----------
+const st=load();
+if(st){ lang=st.lang==="en"?"en":"ru"; wpm=st.wpm||300; }
+$("wpmR").value=wpm; $("wpmV").textContent=wpm;
+if(st && !st.isSample && st.text) setText(st.text, st.docName||"", false, st.pos||0);
+else setText(SAMPLE[lang], "", true, st&&st.isSample? (st.pos||0) : 0);
+})();
+</script>
+
+</body>
+</html>
